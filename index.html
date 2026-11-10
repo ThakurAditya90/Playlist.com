@@ -1377,7 +1377,6 @@ $("playBtn").onclick = () => {
     $("art").classList.remove("spin");
   }
 };
-
 $("prevBtn").onclick = () => loadTrack((current - 1 + tracks.length) % tracks.length);
 $("nextBtn").onclick = () => loadTrack((current + 1) % tracks.length);
 $("rewindBtn").onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 10);
@@ -1387,6 +1386,10 @@ audio.ontimeupdate = () => {
   if (audio.duration) {
     $("progress").value = (audio.currentTime / audio.duration) * 100;
     $("time").textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+    if (audio.duration > FADE_SEC * 2 &&
+        audio.duration - audio.currentTime <= FADE_SEC) {
+      startCrossfade();
+    }
   }
 };
 
@@ -1395,50 +1398,45 @@ $("progress").oninput = (e) => {
     audio.currentTime = (e.target.value / 100) * audio.duration;
   }
 };
+const FADE_SEC = 3;
+let fading = false;
 
+function startCrossfade() {
+  if (fading) return;
+  fading = true;
+
+  // Copy of the ending song that fades out
+  const old = new Audio(audio.src);
+  const resumeAt = audio.currentTime;
+  old.addEventListener("loadedmetadata", () => {
+    old.currentTime = resumeAt;
+    old.play().catch(() => {});
+  }, { once: true });
+
+  // Main player loads the next song and fades in
+  audio.volume = 0;
+  loadTrack((current + 1) % tracks.length);
+
+  const steps = 60;
+  let i = 0;
+  const timer = setInterval(() => {
+    i++;
+    const v = i / steps;
+    audio.volume = Math.min(1, v);
+    old.volume = Math.max(0, 1 - v);
+    if (i >= steps) {
+      clearInterval(timer);
+      old.pause();
+      fading = false;
+    }
+  }, (FADE_SEC * 1000) / steps);
+}
+
+// Fallback for very short songs
 audio.onended = () => {
-  const nextIndex = (current + 1) % tracks.length;
-  // Creates a 3-second crossfade into the next song
-  crossfadeAudio(audio, loadTrack(nextIndex), 3000); 
+  audio.volume = 1;
+  loadTrack((current + 1) % tracks.length);
 };
-// Smooth crossfade function for standard audio elements
-let crossfadeTimer = null;
-
-function crossfadeAudio(currentAudio, nextAudio, durationMs = 3000) {
-  const intervalMs = 50;
-  const totalSteps = durationMs / intervalMs;
-  const stepVolume = 1 / totalSteps;
-
-  nextAudio.volume = 0;
-  nextAudio.play();
-
-  let step = 0;
-  clearInterval(crossfadeTimer);
-
-  crossfadeTimer = setInterval(() => {
-    step++;
-
-    // Fade out current song
-    if (currentAudio && currentAudio.volume >= stepVolume) {
-      currentAudio.volume = Math.max(0, currentAudio.volume - stepVolume);
-    } else if (currentAudio) {
-      currentAudio.volume = 0;
-      currentAudio.pause();
-    }
-
-    // Fade in next song
-    if (nextAudio.volume <= 1 - stepVolume) {
-      nextAudio.volume = Math.min(1, nextAudio.volume + stepVolume);
-    } else {
-      nextAudio.volume = 1;
-    }
-
-    if (step >= totalSteps) {
-  clearInterval(crossfadeTimer);
-}
-
-}, intervalMs);
-}
  
 
 renderPlaylist();
