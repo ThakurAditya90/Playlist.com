@@ -17,6 +17,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
+ .qBtn{background:rgba(217,164,65,.12);border:1px solid rgba(217,164,65,.4);color:var(--amber);font-size:.62rem;padding:5px 7px;border-radius:2px;cursor:pointer;flex:none}
 :root{--steel-1:#3a3d40;--steel-2:#1c1e20;--steel-3:#0a0b0c;--amber:#d9a441;--amber-dim:#8a6a2c;--cream:#e9e6df;--line:rgba(233,230,223,.12);--danger:#c0453a}
 html,body{margin:0;min-height:100vh;font-family:'Rajdhani',sans-serif;}
 body{overflow-x:hidden;background:#0d0f12 url('new.bg.jpg.png.mp4') center/cover no-repeat fixed;}
@@ -1339,7 +1340,9 @@ function renderPlaylist(query = "") {
           <div class="name">${t.title}</div>
           <div class="artist">${t.artist || "Unknown Artist"}</div>
         </div>
-      `;
+        <button class="qBtn" onclick="event.stopPropagation(); playNext(${i})">NEXT</button>
+        <button class="qBtn" onclick="event.stopPropagation(); addToQueue(${i})">+ QUEUE</button
+       `;
       div.onclick = () => loadTrack(i);
       list.appendChild(div);
     }
@@ -1378,7 +1381,7 @@ $("playBtn").onclick = () => {
   }
 };
 $("prevBtn").onclick = () => loadTrack((current - 1 + tracks.length) % tracks.length);
-$("nextBtn").onclick = () => loadTrack((current + 1) % tracks.length);
+$("nextBtn").onclick = () => loadTrack(getNextIndex());
 $("rewindBtn").onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 10);
 $("forwardBtn").onclick = () => audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
 
@@ -1398,6 +1401,22 @@ $("progress").oninput = (e) => {
     audio.currentTime = (e.target.value / 100) * audio.duration;
   }
 };
+ let queue = [];
+
+function getNextIndex() {
+  if (queue.length > 0) return queue.shift();
+  return (current + 1) % tracks.length;
+}
+
+function addToQueue(i) {
+  queue.push(i);
+  showToast("Added to queue: " + tracks[i].title);
+}
+
+function playNext(i) {
+  queue.unshift(i);
+  showToast("Playing next: " + tracks[i].title);
+}
 const FADE_SEC = 3;
 let fading = false;
 
@@ -1435,7 +1454,7 @@ function startCrossfade() {
 // Fallback for very short songs
 audio.onended = () => {
   audio.volume = 1;
-  loadTrack((current + 1) % tracks.length);
+  loadTrack(getNextIndex());
 };
  
 
